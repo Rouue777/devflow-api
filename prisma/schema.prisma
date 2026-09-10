@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =========================
+// ENUMS
+// =========================
+
+enum Prioridade {
+  BAIXA
+  MEDIA
+  ALTA
+}
+
+enum StatusTarefa {
+  CRIADO
+  EM_PROGRESSO
+  EM_REVIEW
+  FEITO
+}
+
+// =========================
+// USUARIO
+// =========================
+
+model Usuario {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  email        String   @unique
+  senha        String
+  dataCadastro DateTime @default(now())
+
+  projetosResponsavel Projeto[]
+  projetos            ProjetoUsuario[]
+  tarefasResponsavel  Tarefa[]
+  comentarios         Comentario[]
+
+  @@map("usuarios")
+}
+
+// =========================
+// PROJETO
+// =========================
+
+model Projeto {
+  id            Int      @id @default(autoincrement())
+  nome          String
+  descricao     String?
+  dataCriacao   DateTime @default(now())
+  responsavelId Int
+
+  responsavel Usuario          @relation(fields: [responsavelId], references: [id])
+  membros     ProjetoUsuario[]
+  tarefas     Tarefa[]
+
+  @@index([responsavelId])
+  @@map("projetos")
+}
+
+// =========================
+// PROJETO_USUARIO
+// =========================
+
+model ProjetoUsuario {
+  projetoId Int
+  usuarioId Int
+
+  projeto Projeto @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@id([projetoId, usuarioId])
+  @@index([usuarioId])
+  @@map("projeto_usuarios")
+}
+
+// =========================
+// TAREFA
+// =========================
+
+model Tarefa {
+  id              Int          @id @default(autoincrement())
+  titulo          String
+  descricao       String?
+  prioridade      Prioridade
+  status          StatusTarefa @default(CRIADO)
+  prazo           DateTime?
+  dataCriacao     DateTime     @default(now())
+  dataAtualizacao DateTime     @updatedAt
+
+  projetoId     Int
+  responsavelId Int?
+
+  projeto     Projeto  @relation(fields: [projetoId], references: [id], onDelete: Cascade)
+  responsavel Usuario? @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+
+  comentarios Comentario[]
+
+  @@index([projetoId])
+  @@index([responsavelId])
+  @@index([status])
+  @@map("tarefas")
+}
+
+// =========================
+// COMENTARIO
+// =========================
+
+model Comentario {
+  id          Int      @id @default(autoincrement())
+  conteudo    String
+  dataCriacao DateTime @default(now())
+
+  tarefaId  Int
+  usuarioId Int
+
+  tarefa  Tarefa  @relation(fields: [tarefaId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@index([tarefaId])
+  @@index([usuarioId])
+  @@map("comentarios")
+}
