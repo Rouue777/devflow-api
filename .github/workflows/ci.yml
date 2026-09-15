@@ -13,6 +13,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Variáveis usadas pelos testes dentro da CI
+    env:
+      NODE_ENV: test
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/devflow_test
+      JWT_SECRET: ci-test-secret
+
+    # PostgreSQL temporário usado pelos testes
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: devflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,8 +47,23 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Generate Prisma Client 
+      - name: Generate Prisma Client
         run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Prepare test database
+        run: npx prisma db push
+
+      - name: Integration tests
+        run: npx vitest run integration
+
+      - name: E2E tests
+        run: npx vitest run e2e
 
       - name: Build
         run: npm run build
