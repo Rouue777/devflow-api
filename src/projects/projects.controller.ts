@@ -8,12 +8,14 @@ import {
   Post,
   Req,
   UseGuards,
+  Delete
 } from '@nestjs/common';
 
 import { ProjectsService } from './projects.service';
 import { CreateProjectDto } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AddProjectMemberDto } from './dto/add-projetc-member.dto';
 
 @Controller('projects')
 @UseGuards(JwtAuthGuard)
@@ -67,4 +69,53 @@ export class ProjectsController {
       dto,
     );
   }
+
+  /// rotas de membros 
+
+  //adicionar membro aop rojeto
+  @Post(':id/members')
+addMember(
+  @Param('id', ParseIntPipe) projectId: number,
+  @Req() request: any,
+  @Body() dto: AddProjectMemberDto,
+) {
+  const userId = request.user.sub;
+
+  return this.projectsService.addMember(
+    projectId,
+    userId,
+    dto.usuarioId,
+  );
+}
+
+//consultar todos memberos do projeto
+@Get(':id/members')
+findMembers(
+  @Param('id', ParseIntPipe) projectId: number,
+  @Req() request: any,
+) {
+  const userId = request.user.sub;
+
+  return this.projectsService.findMembers(
+    projectId,
+    userId,
+  );
+}
+
+
+///deletar membro do projeto
+@Delete(':id/members/:memberId')
+removeMember(
+  @Param('id', ParseIntPipe) projectId: number,
+  @Param('memberId', ParseIntPipe) memberId: number,
+  @Req() request: any,
+) {
+  const userId = request.user.sub;
+
+  return this.projectsService.removeMember(
+    projectId,
+    userId,
+    memberId,
+  );
+}
 }

@@ -229,4 +229,276 @@ describe('Projects - E2E', () => {
       })
       .expect(403);
   });
+
+  describe('Members - E2E', () => {
+  it('deve adicionar um usuário existente ao projeto', async () => {
+    // Cria projeto com o primeiro usuário
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    // Busca o segundo usuário para obter seu ID
+    const outroUsuario = await prisma.usuario.findUnique({
+      where: {
+        email: outroEmail,
+      },
+    });
+
+    // Adiciona segundo usuário
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(201);
+
+    expect(response.body.usuarioId).toBe(
+      outroUsuario!.id,
+    );
+  });
+
+  it('deve impedir usuário que não é responsável de adicionar membro', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const usuarioResponsavel =
+      await prisma.usuario.findUnique({
+        where: {
+          email,
+        },
+      });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${outroToken}`)
+      .send({
+        usuarioId: usuarioResponsavel!.id,
+      })
+      .expect(403);
+  });
+
+  it('deve impedir adicionar usuário que já é membro', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const outroUsuario = await prisma.usuario.findUnique({
+      where: {
+        email: outroEmail,
+      },
+    });
+
+    // Primeira adição
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(201);
+
+    // Segunda tentativa
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(409);
+  });
+
+  it('deve listar os membros do projeto', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const outroUsuario = await prisma.usuario.findUnique({
+      where: {
+        email: outroEmail,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    expect(response.body).toHaveLength(2);
+
+    const ids = response.body.map(
+      (membro: any) => membro.usuario.id,
+    );
+
+    expect(ids).toContain(outroUsuario!.id);
+  });
+
+  it('deve permitir que um membro visualize os membros do projeto', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const outroUsuario = await prisma.usuario.findUnique({
+      where: {
+        email: outroEmail,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${outroToken}`)
+      .expect(200);
+
+    expect(response.body).toHaveLength(2);
+  });
+
+  it('deve remover um membro do projeto', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const outroUsuario = await prisma.usuario.findUnique({
+      where: {
+        email: outroEmail,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .delete(
+        `/api/v1/projects/${projeto.body.id}/members/${outroUsuario!.id}`,
+      )
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200);
+
+    // Confirma que realmente saiu do banco
+    const membroBanco =
+      await prisma.projetoUsuario.findUnique({
+        where: {
+          projetoId_usuarioId: {
+            projetoId: projeto.body.id,
+            usuarioId: outroUsuario!.id,
+          },
+        },
+      });
+
+    expect(membroBanco).toBeNull();
+  });
+
+  it('deve impedir responsável de remover a si próprio', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const responsavel = await prisma.usuario.findUnique({
+      where: {
+        email,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .delete(
+        `/api/v1/projects/${projeto.body.id}/members/${responsavel!.id}`,
+      )
+      .set('Authorization', `Bearer ${token}`)
+      .expect(403);
+  });
+
+  it('deve impedir outro membro de remover participantes', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    const outroUsuario = await prisma.usuario.findUnique({
+      where: {
+        email: outroEmail,
+      },
+    });
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        usuarioId: outroUsuario!.id,
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .delete(
+        `/api/v1/projects/${projeto.body.id}/members/${outroUsuario!.id}`,
+      )
+      .set('Authorization', `Bearer ${outroToken}`)
+      .expect(403);
+  });
+
+  it('deve exigir autenticação para acessar membros', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/projects/${projeto.body.id}/members`)
+      .expect(401);
+  });
+});
 });
