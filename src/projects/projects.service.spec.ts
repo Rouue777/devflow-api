@@ -1,4 +1,5 @@
 import {
+  ConflictException,
   ForbiddenException,
   NotFoundException,
 } from '@nestjs/common';
@@ -17,20 +18,35 @@ describe('ProjectsService', () => {
   let service: ProjectsService;
   let prisma: any;
 
-  beforeEach(() => {
-    prisma = {
-      projeto: {
-        create: vi.fn(),
-        findMany: vi.fn(),
-        findUnique: vi.fn(),
-        update: vi.fn(),
-      },
-    };
+beforeEach(() => {
+  prisma = {
+    projeto: {
+      create: vi.fn(),
+      findMany: vi.fn(),
+      findUnique: vi.fn(),
+      update: vi.fn(),
+    },
 
-    service = new ProjectsService(
-      prisma as PrismaService,
-    );
-  });
+    usuario: {
+      findUnique: vi.fn(),
+    },
+
+    projetoUsuario: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(),
+      create: vi.fn(),
+      delete: vi.fn(),
+    },
+
+    tarefa: {
+      updateMany: vi.fn(),
+    },
+  };
+
+  service = new ProjectsService(
+    prisma as PrismaService,
+  );
+});
 
   describe('create', () => {
     it('deve criar um projeto com o usuário como responsável', async () => {
@@ -240,4 +256,276 @@ describe('ProjectsService', () => {
       ).not.toHaveBeenCalled();
     });
   });
+
+  describe('addMember', () => {
+  it('deve adicionar um usuário existente ao projeto', async () => {
+    const projectId = 1;
+    const userId = 1;
+    const memberId = 2;
+
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: projectId,
+      responsavelId: userId,
+    });
+
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: memberId,
+      nome: 'Novo membro',
+    });
+
+    prisma.projetoUsuario.findUnique.mockResolvedValue(
+      null,
+    );
+
+    const membroCriado = {
+      projetoId: projectId,
+      usuarioId: memberId,
+    };
+
+    prisma.projetoUsuario.create.mockResolvedValue(
+      membroCriado,
+    );
+
+    const result = await service.addMember(
+      projectId,
+      userId,
+      memberId,
+    );
+
+    expect(
+      prisma.projetoUsuario.create,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: {
+          projetoId: projectId,
+          usuarioId: memberId,
+        },
+      }),
+    );
+
+    expect(result).toEqual(membroCriado);
+  });
+
+  it('deve impedir que usuário que não é responsável adicione membro', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 10,
+    });
+
+    await expect(
+      service.addMember(1, 20, 2),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(
+      prisma.projetoUsuario.create,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('deve lançar NotFoundException quando usuário a ser adicionado não existir', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.usuario.findUnique.mockResolvedValue(null);
+
+    await expect(
+      service.addMember(1, 1, 999),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(
+      prisma.projetoUsuario.create,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('deve impedir adicionar usuário que já é membro', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.usuario.findUnique.mockResolvedValue({
+      id: 2,
+    });
+
+    prisma.projetoUsuario.findUnique.mockResolvedValue({
+      projetoId: 1,
+      usuarioId: 2,
+    });
+
+    await expect(
+      service.addMember(1, 1, 2),
+    ).rejects.toBeInstanceOf(ConflictException);
+
+    expect(
+      prisma.projetoUsuario.create,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+describe('findMembers', () => {
+  it('deve listar os membros do projeto', async () => {
+    const projectId = 1;
+    const userId = 1;
+
+    // findMembers chama findOne primeiro
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: projectId,
+      responsavelId: userId,
+      membros: [],
+    });
+
+    const membros = [
+      {
+        usuario: {
+          id: 1,
+          nome: 'Responsável',
+          email: 'responsavel@email.com',
+        },
+      },
+      {
+        usuario: {
+          id: 2,
+          nome: 'Membro',
+          email: 'membro@email.com',
+        },
+      },
+    ];
+
+    prisma.projetoUsuario.findMany.mockResolvedValue(
+      membros,
+    );
+
+    const result = await service.findMembers(
+      projectId,
+      userId,
+    );
+
+    expect(
+      prisma.projetoUsuario.findMany,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          projetoId: projectId,
+        },
+      }),
+    );
+
+    expect(result).toEqual(membros);
+  });
+
+  it('deve impedir usuário sem acesso de listar membros', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 10,
+      membros: [],
+    });
+
+    await expect(
+      service.findMembers(1, 20),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(
+      prisma.projetoUsuario.findMany,
+    ).not.toHaveBeenCalled();
+  });
+});
+
+describe('removeMember', () => {
+  it('deve remover membro do projeto', async () => {
+    const projectId = 1;
+    const userId = 1;
+    const memberId = 2;
+
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: projectId,
+      responsavelId: userId,
+    });
+
+    prisma.projetoUsuario.findUnique.mockResolvedValue({
+      projetoId: projectId,
+      usuarioId: memberId,
+    });
+
+    prisma.tarefa.updateMany.mockResolvedValue({
+      count: 0,
+    });
+
+    prisma.projetoUsuario.delete.mockResolvedValue({
+      projetoId: projectId,
+      usuarioId: memberId,
+    });
+
+    const result = await service.removeMember(
+      projectId,
+      userId,
+      memberId,
+    );
+
+    expect(prisma.tarefa.updateMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: projectId,
+        responsavelId: memberId,
+      },
+      data: {
+        responsavelId: null,
+      },
+    });
+
+    expect(
+      prisma.projetoUsuario.delete,
+    ).toHaveBeenCalled();
+
+    expect(result.usuarioId).toBe(memberId);
+  });
+
+  it('deve impedir que responsável remova a si próprio', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    await expect(
+      service.removeMember(1, 1, 1),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(
+      prisma.projetoUsuario.delete,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('deve impedir outro usuário de remover membro', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 10,
+    });
+
+    await expect(
+      service.removeMember(1, 20, 2),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(
+      prisma.projetoUsuario.delete,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('deve lançar NotFoundException quando membro não pertence ao projeto', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.projetoUsuario.findUnique.mockResolvedValue(
+      null,
+    );
+
+    await expect(
+      service.removeMember(1, 1, 2),
+    ).rejects.toBeInstanceOf(NotFoundException);
+
+    expect(
+      prisma.projetoUsuario.delete,
+    ).not.toHaveBeenCalled();
+  });
+});
 });
