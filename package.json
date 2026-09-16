@@ -18,7 +18,7 @@
   "test:watch": "vitest --watch",
   "test:cov": "vitest run --coverage",
 
-  "test:unit": "vitest run src/users/users.service.spec.ts src/auth/auth.service.spec.ts",
+  "test:unit": "vitest run src/users/users.service.spec.ts src/auth/auth.service.spec.ts src/projects/projects.service.spec.ts",
   "test:integration": "dotenv -e .env.test -- cross-env NODE_ENV=test vitest run integration",
   "test:e2e": "dotenv -e .env.test -- cross-env NODE_ENV=test vitest run e2e",
 
