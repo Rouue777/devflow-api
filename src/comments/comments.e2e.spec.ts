@@ -109,7 +109,13 @@ describe('Comments - E2E', () => {
       },
     });
 
-
+    const outsider = await prisma.usuario.create({
+      data: {
+        nome: 'Comments Outsider E2E',
+        email: outsiderEmail,
+        senha: senhaHash,
+      },
+    });
 
     ownerId = owner.id;
     memberId = member.id;
