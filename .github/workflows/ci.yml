@@ -60,10 +60,10 @@ jobs:
         run: npx prisma db push
 
       - name: Integration tests
-        run: npx vitest run integration
+        run: npx vitest run integration --maxWorkers=1
 
       - name: E2E tests
-        run: npx vitest run e2e
+        run: npx vitest run e2e --maxWorkers=1
 
       - name: Build
         run: npm run build
