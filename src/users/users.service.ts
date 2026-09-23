@@ -1,7 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, Req } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RegisterDto } from './dto/create-usuario.dto';
 import * as bcrypt from 'bcrypt';
+
 
 @Injectable()
 export class UsersService {
@@ -40,7 +41,9 @@ export class UsersService {
         })
 
 
-    } 
+    }
+
+
 
     /// functiona para buscar usuario por email 
      async buscarPorEmail(email: string) {
