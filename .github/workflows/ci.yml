@@ -13,13 +13,11 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Variáveis usadas pelos testes dentro da CI
     env:
       NODE_ENV: test
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/devflow_test
       JWT_SECRET: ci-test-secret
 
-    # PostgreSQL temporário usado pelos testes
     services:
       postgres:
         image: postgres:17
@@ -67,3 +65,18 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+
+    needs: build
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    environment:
+      name: production
+
+    steps:
+      - name: Trigger Render Deploy
+        run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
