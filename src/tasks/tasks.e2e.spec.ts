@@ -371,7 +371,14 @@ describe('GET Tasks', () => {
       )
       .expect(200);
 
-    expect(response.body).toHaveLength(2);
+    expect(response.body.data).toHaveLength(2);
+
+    expect(response.body.meta).toEqual({
+      page: 1,
+      limit: 10,
+      total: 2,
+      totalPages: 1,
+    });
   });
 
   // ==================================================
@@ -409,11 +416,15 @@ describe('GET Tasks', () => {
       )
       .expect(200);
 
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].id).toBe(tarefa.id);
-    expect(response.body[0].status).toBe(
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].id).toBe(
+      tarefa.id,
+    );
+    expect(response.body.data[0].status).toBe(
       StatusTarefa.EM_PROGRESSO,
     );
+
+    expect(response.body.meta.total).toBe(1);
   });
 
   // ==================================================
@@ -449,11 +460,15 @@ describe('GET Tasks', () => {
       )
       .expect(200);
 
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].id).toBe(tarefa.id);
-    expect(response.body[0].prioridade).toBe(
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].id).toBe(
+      tarefa.id,
+    );
+    expect(response.body.data[0].prioridade).toBe(
       Prioridade.ALTA,
     );
+
+    expect(response.body.meta.total).toBe(1);
   });
 
   // ==================================================
@@ -490,11 +505,15 @@ describe('GET Tasks', () => {
       )
       .expect(200);
 
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].id).toBe(tarefa.id);
-    expect(response.body[0].responsavelId).toBe(
-      memberId,
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].id).toBe(
+      tarefa.id,
     );
+    expect(
+      response.body.data[0].responsavelId,
+    ).toBe(memberId);
+
+    expect(response.body.meta.total).toBe(1);
   });
 
   // ==================================================
@@ -536,24 +555,114 @@ describe('GET Tasks', () => {
       )
       .expect(200);
 
-    expect(response.body).toHaveLength(1);
-    expect(response.body[0].id).toBe(tarefa.id);
+    expect(response.body.data).toHaveLength(1);
 
-    expect(response.body[0].status).toBe(
+    expect(response.body.data[0].id).toBe(
+      tarefa.id,
+    );
+
+    expect(response.body.data[0].status).toBe(
       StatusTarefa.EM_PROGRESSO,
     );
 
-    expect(response.body[0].prioridade).toBe(
-      Prioridade.ALTA,
-    );
+    expect(
+      response.body.data[0].prioridade,
+    ).toBe(Prioridade.ALTA);
 
-    expect(response.body[0].responsavelId).toBe(
-      memberId,
-    );
+    expect(
+      response.body.data[0].responsavelId,
+    ).toBe(memberId);
+
+    expect(response.body.meta.total).toBe(1);
   });
 
   // ==================================================
-  // VALIDAÇÃO DOS FILTROS
+  // PAGINAÇÃO
+  // ==================================================
+
+  it('deve paginar tarefas usando page e limit', async () => {
+    for (let i = 1; i <= 5; i++) {
+      await prisma.tarefa.create({
+        data: {
+          titulo: `Task ${i}`,
+          prioridade: Prioridade.MEDIA,
+          projetoId: projectId,
+        },
+      });
+    }
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks?page=2&limit=2`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body.data).toHaveLength(2);
+
+    expect(response.body.meta).toEqual({
+      page: 2,
+      limit: 2,
+      total: 5,
+      totalPages: 3,
+    });
+  });
+
+  it('deve combinar filtros com paginação', async () => {
+    for (let i = 1; i <= 3; i++) {
+      await prisma.tarefa.create({
+        data: {
+          titulo: `Task alta ${i}`,
+          prioridade: Prioridade.ALTA,
+          projetoId: projectId,
+        },
+      });
+    }
+
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task baixa',
+        prioridade: Prioridade.BAIXA,
+        projetoId: projectId,
+      },
+    });
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks?prioridade=ALTA&page=1&limit=2`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body.data).toHaveLength(2);
+
+    expect(
+      response.body.data.every(
+        (tarefa: any) =>
+          tarefa.prioridade === Prioridade.ALTA,
+      ),
+    ).toBe(true);
+
+    expect(response.body.meta).toEqual({
+      page: 1,
+      limit: 2,
+      total: 3,
+      totalPages: 2,
+    });
+  });
+
+  // ==================================================
+  // VALIDAÇÃO
   // ==================================================
 
   it('deve rejeitar status inválido', async () => {
@@ -584,6 +693,42 @@ describe('GET Tasks', () => {
     await request(app.getHttpServer())
       .get(
         `/api/v1/projects/${projectId}/tasks?responsavelId=abc`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(400);
+  });
+
+  it('deve rejeitar page menor que 1', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks?page=0`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(400);
+  });
+
+  it('deve rejeitar limit menor que 1', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks?limit=0`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(400);
+  });
+
+  it('deve rejeitar limit maior que 100', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks?limit=101`,
       )
       .set(
         'Authorization',
@@ -647,7 +792,6 @@ describe('GET Tasks', () => {
       .expect(403);
   });
 });
-
   
   // ==================================================
   // UPDATE

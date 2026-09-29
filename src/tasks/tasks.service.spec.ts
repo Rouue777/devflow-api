@@ -67,6 +67,7 @@ describe('TasksService', () => {
         findFirst: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
+        count: vi.fn(),
       },
     };
 
@@ -241,9 +242,10 @@ describe('TasksService', () => {
     });
   });
 
-  // ==================================================
-  // FIND ALL
-  // ==================================================
+ // ==================================================
+// FIND ALL
+// ==================================================
+
 describe('findAll', () => {
   it('deve listar todas as tarefas do projeto quando nenhum filtro for informado', async () => {
     prisma.projeto.findUnique.mockResolvedValue({
@@ -252,6 +254,7 @@ describe('findAll', () => {
     });
 
     prisma.tarefa.findMany.mockResolvedValue([]);
+    prisma.tarefa.count.mockResolvedValue(0);
 
     const result = await service.findAll(1, 1, {});
 
@@ -262,6 +265,8 @@ describe('findAll', () => {
         prioridade: undefined,
         responsavelId: undefined,
       },
+      skip: 0,
+      take: 10,
       include: {
         responsavel: {
           select: {
@@ -276,7 +281,24 @@ describe('findAll', () => {
       },
     });
 
-    expect(result).toEqual([]);
+    expect(prisma.tarefa.count).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: undefined,
+        prioridade: undefined,
+        responsavelId: undefined,
+      },
+    });
+
+    expect(result).toEqual({
+      data: [],
+      meta: {
+        page: 1,
+        limit: 10,
+        total: 0,
+        totalPages: 0,
+      },
+    });
   });
 
   it('deve filtrar tarefas por status', async () => {
@@ -286,6 +308,7 @@ describe('findAll', () => {
     });
 
     prisma.tarefa.findMany.mockResolvedValue([]);
+    prisma.tarefa.count.mockResolvedValue(0);
 
     await service.findAll(1, 1, {
       status: StatusTarefa.EM_PROGRESSO,
@@ -298,6 +321,8 @@ describe('findAll', () => {
         prioridade: undefined,
         responsavelId: undefined,
       },
+      skip: 0,
+      take: 10,
       include: {
         responsavel: {
           select: {
@@ -320,6 +345,7 @@ describe('findAll', () => {
     });
 
     prisma.tarefa.findMany.mockResolvedValue([]);
+    prisma.tarefa.count.mockResolvedValue(0);
 
     await service.findAll(1, 1, {
       prioridade: Prioridade.ALTA,
@@ -332,6 +358,8 @@ describe('findAll', () => {
         prioridade: Prioridade.ALTA,
         responsavelId: undefined,
       },
+      skip: 0,
+      take: 10,
       include: {
         responsavel: {
           select: {
@@ -354,6 +382,7 @@ describe('findAll', () => {
     });
 
     prisma.tarefa.findMany.mockResolvedValue([]);
+    prisma.tarefa.count.mockResolvedValue(0);
 
     await service.findAll(1, 1, {
       responsavelId: 2,
@@ -366,6 +395,8 @@ describe('findAll', () => {
         prioridade: undefined,
         responsavelId: 2,
       },
+      skip: 0,
+      take: 10,
       include: {
         responsavel: {
           select: {
@@ -388,6 +419,7 @@ describe('findAll', () => {
     });
 
     prisma.tarefa.findMany.mockResolvedValue([]);
+    prisma.tarefa.count.mockResolvedValue(0);
 
     await service.findAll(1, 1, {
       status: StatusTarefa.EM_PROGRESSO,
@@ -402,6 +434,8 @@ describe('findAll', () => {
         prioridade: Prioridade.ALTA,
         responsavelId: 2,
       },
+      skip: 0,
+      take: 10,
       include: {
         responsavel: {
           select: {
@@ -416,8 +450,64 @@ describe('findAll', () => {
       },
     });
   });
-});
 
+  it('deve aplicar paginação personalizada', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.tarefa.findMany.mockResolvedValue([]);
+    prisma.tarefa.count.mockResolvedValue(25);
+
+    const result = await service.findAll(1, 1, {
+      page: 2,
+      limit: 10,
+    });
+
+    expect(prisma.tarefa.findMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: undefined,
+        prioridade: undefined,
+        responsavelId: undefined,
+      },
+      skip: 10,
+      take: 10,
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    });
+
+    expect(prisma.tarefa.count).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: undefined,
+        prioridade: undefined,
+        responsavelId: undefined,
+      },
+    });
+
+    expect(result).toEqual({
+      data: [],
+      meta: {
+        page: 2,
+        limit: 10,
+        total: 25,
+        totalPages: 3,
+      },
+    });
+  });
+});
   // ==================================================
   // FIND ONE
   // ==================================================
