@@ -14,11 +14,13 @@ import request from 'supertest';
 import { AppModule } from '../app.module';
 import { PrismaService } from '../prisma/prisma.service';
 
-describe('Auth E2E', () => {
+describe('Users E2E', () => {
     let app: INestApplication;
     let prisma: PrismaService;
 
     const emailTeste = 'users.e2e@email.com';
+    const segundoEmail = 'users2.e2e@email.com';
+    const novoEmail = 'users.novo.e2e@email.com';
 
     beforeAll(async () => {
         const moduleFixture: TestingModule =
@@ -28,9 +30,6 @@ describe('Auth E2E', () => {
 
         app = moduleFixture.createNestApplication();
 
-        // Importante:
-        // o app de teste não herda automaticamente
-        // os pipes configurados no main.ts.
         app.useGlobalPipes(
             new ValidationPipe({
                 whitelist: true,
@@ -48,7 +47,13 @@ describe('Auth E2E', () => {
     beforeEach(async () => {
         await prisma.usuario.deleteMany({
             where: {
-                email: emailTeste,
+                email: {
+                    in: [
+                        emailTeste,
+                        segundoEmail,
+                        novoEmail,
+                    ],
+                },
             },
         });
     });
@@ -56,7 +61,13 @@ describe('Auth E2E', () => {
     afterAll(async () => {
         await prisma.usuario.deleteMany({
             where: {
-                email: emailTeste,
+                email: {
+                    in: [
+                        emailTeste,
+                        segundoEmail,
+                        novoEmail,
+                    ],
+                },
             },
         });
 
@@ -68,19 +79,16 @@ describe('Auth E2E', () => {
     // ==========================================================
 
     it('deve cadastrar um usuário pela API', async () => {
-        // ARRANGE
         const dto = {
             nome: 'Jeferson',
             email: emailTeste,
             senha: '123456',
         };
 
-        // ACT
         const response = await request(app.getHttpServer())
             .post('/users/register')
             .send(dto);
 
-        // ASSERT
         expect(response.status).toBe(201);
 
         expect(response.body).toMatchObject({
@@ -89,11 +97,8 @@ describe('Auth E2E', () => {
         });
 
         expect(response.body.id).toBeDefined();
-
-        // A senha não deve voltar na resposta
         expect(response.body.senha).toBeUndefined();
 
-        // Confirma no banco real de testes
         const usuario = await prisma.usuario.findUnique({
             where: {
                 email: emailTeste,
@@ -104,24 +109,20 @@ describe('Auth E2E', () => {
     });
 
     it('deve rejeitar dados inválidos no cadastro', async () => {
-        // ARRANGE
         const dtoInvalido = {
             nome: '',
             email: 'email-invalido',
             senha: '123',
         };
 
-        // ACT
         const response = await request(app.getHttpServer())
             .post('/users/register')
             .send(dtoInvalido);
 
-        // ASSERT
         expect(response.status).toBe(400);
     });
 
     it('deve rejeitar cadastro com e-mail duplicado', async () => {
-        // ARRANGE
         const dto = {
             nome: 'Jeferson',
             email: emailTeste,
@@ -133,16 +134,142 @@ describe('Auth E2E', () => {
             .send(dto)
             .expect(201);
 
-        // ACT
         const response = await request(app.getHttpServer())
             .post('/users/register')
             .send(dto);
 
-        // ASSERT
         expect(response.status).toBe(409);
 
         expect(response.body.message).toBe(
             'E-mail já cadastrado',
         );
     });
-})
+
+    // ==========================================================
+    // GET PROFILE
+    // ==========================================================
+
+    it('GET /users/me deve exigir autenticação', async () => {
+        await request(app.getHttpServer())
+            .get('/users/me')
+            .expect(401);
+    });
+
+    it('GET /users/me deve retornar o usuário autenticado sem senha', async () => {
+        const token = await criarUsuarioEObterToken();
+
+        const response = await request(app.getHttpServer())
+            .get('/users/me')
+            .set('Authorization', `Bearer ${token}`)
+            .expect(200);
+
+        expect(response.body.nome).toBe('Jeferson');
+        expect(response.body.email).toBe(emailTeste);
+        expect(response.body.id).toBeDefined();
+
+        expect(response.body).not.toHaveProperty('senha');
+    });
+
+    // ==========================================================
+    // UPDATE PROFILE
+    // ==========================================================
+
+    it('PATCH /users/me deve atualizar o perfil', async () => {
+        const token = await criarUsuarioEObterToken();
+
+        const response = await request(app.getHttpServer())
+            .patch('/users/me')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                nome: 'Jeferson Santos',
+                email: novoEmail,
+            })
+            .expect(200);
+
+        expect(response.body.nome).toBe('Jeferson Santos');
+        expect(response.body.email).toBe(novoEmail);
+        expect(response.body).not.toHaveProperty('senha');
+
+        // Confirma persistência no banco
+        const usuarioBanco = await prisma.usuario.findUnique({
+            where: {
+                email: novoEmail,
+            },
+        });
+
+        expect(usuarioBanco).not.toBeNull();
+        expect(usuarioBanco?.nome).toBe('Jeferson Santos');
+    });
+
+    it('PATCH /users/me deve rejeitar email inválido', async () => {
+        const token = await criarUsuarioEObterToken();
+
+        await request(app.getHttpServer())
+            .patch('/users/me')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                email: 'email-invalido',
+            })
+            .expect(400);
+    });
+
+    it('PATCH /users/me deve retornar 409 para email duplicado', async () => {
+        const token = await criarUsuarioEObterToken();
+
+        // Segundo usuário
+        await request(app.getHttpServer())
+            .post('/users/register')
+            .send({
+                nome: 'Segundo usuário',
+                email: segundoEmail,
+                senha: '123456',
+            })
+            .expect(201);
+
+        const response = await request(app.getHttpServer())
+            .patch('/users/me')
+            .set('Authorization', `Bearer ${token}`)
+            .send({
+                email: segundoEmail,
+            });
+
+        expect(response.status).toBe(409);
+        expect(response.body.message).toBe(
+            'E-mail já está em uso',
+        );
+    });
+
+    it('PATCH /users/me deve exigir autenticação', async () => {
+        await request(app.getHttpServer())
+            .patch('/users/me')
+            .send({
+                nome: 'Jeferson Santos',
+            })
+            .expect(401);
+    });
+
+    // ==========================================================
+    // HELPER
+    // ==========================================================
+
+    async function criarUsuarioEObterToken(): Promise<string> {
+        await request(app.getHttpServer())
+            .post('/users/register')
+            .send({
+                nome: 'Jeferson',
+                email: emailTeste,
+                senha: '123456',
+            })
+            .expect(201);
+
+        const login = await request(app.getHttpServer())
+            .post('/auth/login')
+            .send({
+                email: emailTeste,
+                senha: '123456',
+            })
+            .expect(201);
+
+        return login.body.access_token;
+    }
+});
