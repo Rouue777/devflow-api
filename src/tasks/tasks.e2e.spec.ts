@@ -337,95 +337,318 @@ describe('Tasks - E2E', () => {
     });
   });
 
-  // ==================================================
-  // FIND ALL / FIND ONE
-  // ==================================================
+// ==================================================
+// FIND ALL / FIND ONE
+// ==================================================
 
-  describe('GET Tasks', () => {
-    it('deve listar tarefas do projeto', async () => {
-      await prisma.tarefa.create({
-        data: {
-          titulo: 'Task 1',
-          prioridade: Prioridade.ALTA,
-          projetoId : projectId,
-        },
-      });
+describe('GET Tasks', () => {
+  it('deve listar tarefas do projeto', async () => {
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task 1',
+        prioridade: Prioridade.ALTA,
+        projetoId: projectId,
+      },
+    });
 
-      await prisma.tarefa.create({
-        data: {
-          titulo: 'Task 2',
-          prioridade: Prioridade.MEDIA,
-          projetoId : projectId,
-        },
-      });
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task 2',
+        prioridade: Prioridade.MEDIA,
+        projetoId: projectId,
+      },
+    });
 
-      const response = await request(
-        app.getHttpServer(),
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks`,
       )
-        .get(
-          `/api/v1/projects/${projectId}/tasks`,
-        )
-        .set(
-          'Authorization',
-          `Bearer ${memberToken}`,
-        )
-        .expect(200);
-
-      expect(response.body).toHaveLength(2);
-    });
-
-    it('deve buscar uma tarefa específica', async () => {
-      const tarefa =
-        await prisma.tarefa.create({
-          data: {
-            titulo: 'Task específica',
-            prioridade: Prioridade.ALTA,
-            projetoId : projectId,
-          },
-        });
-
-      const response = await request(
-        app.getHttpServer(),
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
       )
-        .get(
-          `/api/v1/projects/${projectId}/tasks/${tarefa.id}`,
-        )
-        .set(
-          'Authorization',
-          `Bearer ${memberToken}`,
-        )
-        .expect(200);
+      .expect(200);
 
-      expect(response.body.id).toBe(
-        tarefa.id,
-      );
-    });
-
-    it('deve retornar 404 para tarefa inexistente', async () => {
-      await request(app.getHttpServer())
-        .get(
-          `/api/v1/projects/${projectId}/tasks/999999`,
-        )
-        .set(
-          'Authorization',
-          `Bearer ${ownerToken}`,
-        )
-        .expect(404);
-    });
-
-    it('deve impedir outsider de listar tarefas', async () => {
-      await request(app.getHttpServer())
-        .get(
-          `/api/v1/projects/${projectId}/tasks`,
-        )
-        .set(
-          'Authorization',
-          `Bearer ${outsiderToken}`,
-        )
-        .expect(403);
-    });
+    expect(response.body).toHaveLength(2);
   });
 
+  // ==================================================
+  // FILTRO POR STATUS
+  // ==================================================
+
+  it('deve filtrar tarefas por status', async () => {
+    const tarefa = await prisma.tarefa.create({
+      data: {
+        titulo: 'Task em progresso',
+        prioridade: Prioridade.ALTA,
+        status: StatusTarefa.EM_PROGRESSO,
+        projetoId: projectId,
+      },
+    });
+
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task criada',
+        prioridade: Prioridade.MEDIA,
+        status: StatusTarefa.CRIADO,
+        projetoId: projectId,
+      },
+    });
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks?status=EM_PROGRESSO`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].id).toBe(tarefa.id);
+    expect(response.body[0].status).toBe(
+      StatusTarefa.EM_PROGRESSO,
+    );
+  });
+
+  // ==================================================
+  // FILTRO POR PRIORIDADE
+  // ==================================================
+
+  it('deve filtrar tarefas por prioridade', async () => {
+    const tarefa = await prisma.tarefa.create({
+      data: {
+        titulo: 'Task alta',
+        prioridade: Prioridade.ALTA,
+        projetoId: projectId,
+      },
+    });
+
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task baixa',
+        prioridade: Prioridade.BAIXA,
+        projetoId: projectId,
+      },
+    });
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks?prioridade=ALTA`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].id).toBe(tarefa.id);
+    expect(response.body[0].prioridade).toBe(
+      Prioridade.ALTA,
+    );
+  });
+
+  // ==================================================
+  // FILTRO POR RESPONSÁVEL
+  // ==================================================
+
+  it('deve filtrar tarefas por responsavelId', async () => {
+    const tarefa = await prisma.tarefa.create({
+      data: {
+        titulo: 'Task do membro',
+        prioridade: Prioridade.ALTA,
+        projetoId: projectId,
+        responsavelId: memberId,
+      },
+    });
+
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task sem responsável',
+        prioridade: Prioridade.MEDIA,
+        projetoId: projectId,
+      },
+    });
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks?responsavelId=${memberId}`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].id).toBe(tarefa.id);
+    expect(response.body[0].responsavelId).toBe(
+      memberId,
+    );
+  });
+
+  // ==================================================
+  // COMBINAÇÃO DE FILTROS
+  // ==================================================
+
+  it('deve combinar status, prioridade e responsavelId', async () => {
+    const tarefa = await prisma.tarefa.create({
+      data: {
+        titulo: 'Task correspondente',
+        prioridade: Prioridade.ALTA,
+        status: StatusTarefa.EM_PROGRESSO,
+        projetoId: projectId,
+        responsavelId: memberId,
+      },
+    });
+
+    await prisma.tarefa.create({
+      data: {
+        titulo: 'Task diferente',
+        prioridade: Prioridade.BAIXA,
+        status: StatusTarefa.CRIADO,
+        projetoId: projectId,
+      },
+    });
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks` +
+          `?status=EM_PROGRESSO` +
+          `&prioridade=ALTA` +
+          `&responsavelId=${memberId}`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body).toHaveLength(1);
+    expect(response.body[0].id).toBe(tarefa.id);
+
+    expect(response.body[0].status).toBe(
+      StatusTarefa.EM_PROGRESSO,
+    );
+
+    expect(response.body[0].prioridade).toBe(
+      Prioridade.ALTA,
+    );
+
+    expect(response.body[0].responsavelId).toBe(
+      memberId,
+    );
+  });
+
+  // ==================================================
+  // VALIDAÇÃO DOS FILTROS
+  // ==================================================
+
+  it('deve rejeitar status inválido', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks?status=INVALIDO`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(400);
+  });
+
+  it('deve rejeitar prioridade inválida', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks?prioridade=URGENTE`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(400);
+  });
+
+  it('deve rejeitar responsavelId inválido', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks?responsavelId=abc`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(400);
+  });
+
+  // ==================================================
+  // FIND ONE
+  // ==================================================
+
+  it('deve buscar uma tarefa específica', async () => {
+    const tarefa =
+      await prisma.tarefa.create({
+        data: {
+          titulo: 'Task específica',
+          prioridade: Prioridade.ALTA,
+          projetoId: projectId,
+        },
+      });
+
+    const response = await request(
+      app.getHttpServer(),
+    )
+      .get(
+        `/api/v1/projects/${projectId}/tasks/${tarefa.id}`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${memberToken}`,
+      )
+      .expect(200);
+
+    expect(response.body.id).toBe(
+      tarefa.id,
+    );
+  });
+
+  it('deve retornar 404 para tarefa inexistente', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks/999999`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${ownerToken}`,
+      )
+      .expect(404);
+  });
+
+  it('deve impedir outsider de listar tarefas', async () => {
+    await request(app.getHttpServer())
+      .get(
+        `/api/v1/projects/${projectId}/tasks`,
+      )
+      .set(
+        'Authorization',
+        `Bearer ${outsiderToken}`,
+      )
+      .expect(403);
+  });
+});
+
+  
   // ==================================================
   // UPDATE
   // ==================================================

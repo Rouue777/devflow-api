@@ -10,6 +10,8 @@ import { StatusTarefa } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateTaskDto } from './dto/create.task.dto';
 import { UpdateTaskDto } from './dto/update.task.dto';
+import { FilterTasksDto } from './dto/filter-tasks.dto';
+
 
 
 @Injectable()
@@ -73,30 +75,34 @@ export class TasksService {
   // LISTAR TAREFAS
   // =========================
 
-  async findAll(
-    projectId: number,
-    userId: number,
-  ) {
-    await this.checkProjectMember(projectId, userId);
+ async findAll(
+  projectId: number,
+  userId: number,
+  filters: FilterTasksDto,
+) {
+  await this.checkProjectMember(projectId, userId);
 
-    return this.prisma.tarefa.findMany({
-      where: {
-        projetoId: projectId,
-      },
-      include: {
-        responsavel: {
-          select: {
-            id: true,
-            nome: true,
-            email: true,
-          },
+  return this.prisma.tarefa.findMany({
+    where: {
+      projetoId: projectId,
+      status: filters.status,
+      prioridade: filters.prioridade,
+      responsavelId: filters.responsavelId,
+    },
+    include: {
+      responsavel: {
+        select: {
+          id: true,
+          nome: true,
+          email: true,
         },
       },
-      orderBy: {
-        dataCriacao: 'desc',
-      },
-    });
-  }
+    },
+    orderBy: {
+      dataCriacao: 'desc',
+    },
+  });
+}
 
   // =========================
   // BUSCAR TAREFA

@@ -265,90 +265,260 @@ describe('TasksService - integração', () => {
     });
   });
 
-  // ==================================================
-  // FIND ALL / FIND ONE
-  // ==================================================
+// ==================================================
+// FIND ALL / FIND ONE
+// ==================================================
 
-  describe('consultas', () => {
-    it('deve listar somente tarefas do projeto', async () => {
-      await service.create(
-        projectId,
-        userId,
-        {
-          titulo: 'Task 1',
-          prioridade: Prioridade.ALTA,
-        },
-      );
+describe('consultas', () => {
+  it('deve listar somente tarefas do projeto sem filtros', async () => {
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task 1',
+        prioridade: Prioridade.ALTA,
+      },
+    );
 
-      await service.create(
-        projectId,
-        userId,
-        {
-          titulo: 'Task 2',
-          prioridade: Prioridade.MEDIA,
-        },
-      );
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task 2',
+        prioridade: Prioridade.MEDIA,
+      },
+    );
 
-      const tarefas = await service.findAll(
-        projectId,
-        memberId,
-      );
+    const tarefas = await service.findAll(
+      projectId,
+      memberId,
+      {},
+    );
 
-      expect(tarefas).toHaveLength(2);
+    expect(tarefas).toHaveLength(2);
 
-      expect(
-        tarefas.every(
-          (tarefa) =>
-            tarefa.projetoId === projectId,
-        ),
-      ).toBe(true);
-    });
-
-    it('deve buscar uma tarefa específica', async () => {
-      const criada = await service.create(
-        projectId,
-        userId,
-        {
-          titulo: 'Task específica',
-          prioridade: Prioridade.ALTA,
-        },
-      );
-
-      const tarefa = await service.findOne(
-        projectId,
-        criada.id,
-        memberId,
-      );
-
-      expect(tarefa.id).toBe(criada.id);
-      expect(tarefa.titulo).toBe(
-        'Task específica',
-      );
-    });
-
-    it('deve impedir usuário fora do projeto de listar tarefas', async () => {
-      await expect(
-        service.findAll(
-          projectId,
-          outsiderId,
-        ),
-      ).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
-    });
-
-    it('deve lançar erro ao buscar tarefa inexistente', async () => {
-      await expect(
-        service.findOne(
-          projectId,
-          999999,
-          userId,
-        ),
-      ).rejects.toBeInstanceOf(
-        NotFoundException,
-      );
-    });
+    expect(
+      tarefas.every(
+        (tarefa) =>
+          tarefa.projetoId === projectId,
+      ),
+    ).toBe(true);
   });
+
+  it('deve filtrar tarefas por status', async () => {
+    const task1 = await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task criada',
+        prioridade: Prioridade.ALTA,
+      },
+    );
+
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Outra task',
+        prioridade: Prioridade.MEDIA,
+      },
+    );
+
+    await prisma.tarefa.update({
+      where: { id: task1.id },
+      data: {
+        status: StatusTarefa.EM_PROGRESSO,
+      },
+    });
+
+    const tarefas = await service.findAll(
+      projectId,
+      userId,
+      {
+        status: StatusTarefa.EM_PROGRESSO,
+      },
+    );
+
+    expect(tarefas).toHaveLength(1);
+    expect(tarefas[0].id).toBe(task1.id);
+    expect(tarefas[0].status).toBe(
+      StatusTarefa.EM_PROGRESSO,
+    );
+  });
+
+  it('deve filtrar tarefas por prioridade', async () => {
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task alta',
+        prioridade: Prioridade.ALTA,
+      },
+    );
+
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task baixa',
+        prioridade: Prioridade.BAIXA,
+      },
+    );
+
+    const tarefas = await service.findAll(
+      projectId,
+      userId,
+      {
+        prioridade: Prioridade.ALTA,
+      },
+    );
+
+    expect(tarefas).toHaveLength(1);
+    expect(tarefas[0].titulo).toBe('Task alta');
+    expect(tarefas[0].prioridade).toBe(
+      Prioridade.ALTA,
+    );
+  });
+
+  it('deve filtrar tarefas por responsável', async () => {
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task do membro',
+        prioridade: Prioridade.ALTA,
+        responsavelId: memberId,
+      },
+    );
+
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task sem responsável',
+        prioridade: Prioridade.MEDIA,
+      },
+    );
+
+    const tarefas = await service.findAll(
+      projectId,
+      userId,
+      {
+        responsavelId: memberId,
+      },
+    );
+
+    expect(tarefas).toHaveLength(1);
+    expect(tarefas[0].titulo).toBe(
+      'Task do membro',
+    );
+    expect(tarefas[0].responsavelId).toBe(
+      memberId,
+    );
+  });
+
+  it('deve combinar status, prioridade e responsável', async () => {
+    const task = await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task correspondente',
+        prioridade: Prioridade.ALTA,
+        responsavelId: memberId,
+      },
+    );
+
+    await prisma.tarefa.update({
+      where: { id: task.id },
+      data: {
+        status: StatusTarefa.EM_PROGRESSO,
+      },
+    });
+
+    await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task diferente',
+        prioridade: Prioridade.BAIXA,
+      },
+    );
+
+    const tarefas = await service.findAll(
+      projectId,
+      userId,
+      {
+        status: StatusTarefa.EM_PROGRESSO,
+        prioridade: Prioridade.ALTA,
+        responsavelId: memberId,
+      },
+    );
+
+    expect(tarefas).toHaveLength(1);
+
+    expect(tarefas[0].titulo).toBe(
+      'Task correspondente',
+    );
+
+    expect(tarefas[0].status).toBe(
+      StatusTarefa.EM_PROGRESSO,
+    );
+
+    expect(tarefas[0].prioridade).toBe(
+      Prioridade.ALTA,
+    );
+
+    expect(tarefas[0].responsavelId).toBe(
+      memberId,
+    );
+  });
+
+  it('deve buscar uma tarefa específica', async () => {
+    const criada = await service.create(
+      projectId,
+      userId,
+      {
+        titulo: 'Task específica',
+        prioridade: Prioridade.ALTA,
+      },
+    );
+
+    const tarefa = await service.findOne(
+      projectId,
+      criada.id,
+      memberId,
+    );
+
+    expect(tarefa.id).toBe(criada.id);
+    expect(tarefa.titulo).toBe(
+      'Task específica',
+    );
+  });
+
+  it('deve impedir usuário fora do projeto de listar tarefas', async () => {
+    await expect(
+      service.findAll(
+        projectId,
+        outsiderId,
+        {},
+      ),
+    ).rejects.toBeInstanceOf(
+      ForbiddenException,
+    );
+  });
+
+  it('deve lançar erro ao buscar tarefa inexistente', async () => {
+    await expect(
+      service.findOne(
+        projectId,
+        999999,
+        userId,
+      ),
+    ).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+});
 
   // ==================================================
   // UPDATE

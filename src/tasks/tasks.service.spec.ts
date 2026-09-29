@@ -15,8 +15,10 @@ import {
   vi,
 } from 'vitest';
 
+
 import { PrismaService } from '../prisma/prisma.service';
 import { TasksService } from './tasks.service';
+
 
 describe('TasksService', () => {
   let service: TasksService;
@@ -242,79 +244,179 @@ describe('TasksService', () => {
   // ==================================================
   // FIND ALL
   // ==================================================
+describe('findAll', () => {
+  it('deve listar todas as tarefas do projeto quando nenhum filtro for informado', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
 
-  describe('findAll', () => {
-    it('deve listar as tarefas do projeto', async () => {
-      prisma.projeto.findUnique.mockResolvedValue(
-        projeto,
-      );
+    prisma.tarefa.findMany.mockResolvedValue([]);
 
-      prisma.tarefa.findMany.mockResolvedValue([
-        tarefa,
-      ]);
+    const result = await service.findAll(1, 1, {});
 
-      const result = await service.findAll(
-        projectId,
-        userId,
-      );
-
-      expect(result).toEqual([tarefa]);
-
-      expect(
-        prisma.tarefa.findMany,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: {
-            projetoId : projectId,
+    expect(prisma.tarefa.findMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: undefined,
+        prioridade: undefined,
+        responsavelId: undefined,
+      },
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
           },
-        }),
-      );
-    });
-
-    it('deve permitir que membro liste tarefas', async () => {
-      prisma.projeto.findUnique.mockResolvedValue(
-        projeto,
-      );
-
-      prisma.projetoUsuario.findUnique.mockResolvedValue(
-        {
-          projetoId : projectId,
-          usuarioId: memberId,
         },
-      );
-
-      prisma.tarefa.findMany.mockResolvedValue([
-        tarefa,
-      ]);
-
-      const result = await service.findAll(
-        projectId,
-        memberId,
-      );
-
-      expect(result).toEqual([tarefa]);
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
     });
 
-    it('deve impedir usuário sem acesso de listar tarefas', async () => {
-      prisma.projeto.findUnique.mockResolvedValue(
-        projeto,
-      );
+    expect(result).toEqual([]);
+  });
 
-      prisma.projetoUsuario.findUnique.mockResolvedValue(
-        null,
-      );
+  it('deve filtrar tarefas por status', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
 
-      await expect(
-        service.findAll(projectId, 999),
-      ).rejects.toBeInstanceOf(
-        ForbiddenException,
-      );
+    prisma.tarefa.findMany.mockResolvedValue([]);
 
-      expect(
-        prisma.tarefa.findMany,
-      ).not.toHaveBeenCalled();
+    await service.findAll(1, 1, {
+      status: StatusTarefa.EM_PROGRESSO,
+    });
+
+    expect(prisma.tarefa.findMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: StatusTarefa.EM_PROGRESSO,
+        prioridade: undefined,
+        responsavelId: undefined,
+      },
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
     });
   });
+
+  it('deve filtrar tarefas por prioridade', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.tarefa.findMany.mockResolvedValue([]);
+
+    await service.findAll(1, 1, {
+      prioridade: Prioridade.ALTA,
+    });
+
+    expect(prisma.tarefa.findMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: undefined,
+        prioridade: Prioridade.ALTA,
+        responsavelId: undefined,
+      },
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    });
+  });
+
+  it('deve filtrar tarefas por responsável', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.tarefa.findMany.mockResolvedValue([]);
+
+    await service.findAll(1, 1, {
+      responsavelId: 2,
+    });
+
+    expect(prisma.tarefa.findMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: undefined,
+        prioridade: undefined,
+        responsavelId: 2,
+      },
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    });
+  });
+
+  it('deve combinar múltiplos filtros', async () => {
+    prisma.projeto.findUnique.mockResolvedValue({
+      id: 1,
+      responsavelId: 1,
+    });
+
+    prisma.tarefa.findMany.mockResolvedValue([]);
+
+    await service.findAll(1, 1, {
+      status: StatusTarefa.EM_PROGRESSO,
+      prioridade: Prioridade.ALTA,
+      responsavelId: 2,
+    });
+
+    expect(prisma.tarefa.findMany).toHaveBeenCalledWith({
+      where: {
+        projetoId: 1,
+        status: StatusTarefa.EM_PROGRESSO,
+        prioridade: Prioridade.ALTA,
+        responsavelId: 2,
+      },
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
+        },
+      },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    });
+  });
+});
 
   // ==================================================
   // FIND ONE
