@@ -7,6 +7,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -19,6 +20,7 @@ import { AssignTaskResponsibleDto } from './dto/assign-task-responsible.dto';
 import { UpdateTaskStatusDto } from './dto/update-task-status.dto';
 import { CreateTaskDto } from './dto/create.task.dto';
 import { UpdateTaskDto } from './dto/update.task.dto';
+import { FilterTasksDto } from './dto/filter-tasks.dto';
 
 @Controller('projects/:projectId/tasks')
 @UseGuards(JwtAuthGuard)
@@ -52,13 +54,14 @@ export class TasksController {
   findAll(
     @Param('projectId', ParseIntPipe)
     projectId: number,
-
     @Req()
     request: any,
+    @Query() filters : FilterTasksDto
   ) {
     return this.tasksService.findAll(
       projectId,
       request.user.sub,
+      filters,
     );
   }
 
@@ -168,4 +171,7 @@ export class TasksController {
       request.user.sub,
     );
   }
+
+ //
+
 }
