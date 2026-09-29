@@ -1,6 +1,8 @@
-import { Body, Controller,  Post, } from '@nestjs/common';
+import { Body, Controller,  Get,  Patch,  Post, Req, UseGuards, } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { RegisterDto } from './dto/create-usuario.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 
 
@@ -18,5 +20,19 @@ async register(@Body() dto : RegisterDto){
     return this.userService.register(dto)
 }
 
+@Get('me')
+@UseGuards(JwtAuthGuard)
+getProfile(@Req() req: any) {
+  return this.userService.getProfile(req.user.sub);
+}
+
+@Patch('me')
+@UseGuards(JwtAuthGuard)
+updateProfile(
+  @Req() req: any,
+  @Body() dto: UpdateProfileDto,
+) {
+  return this.userService.updateProfile(req.user.sub, dto);
+}
 
 }
