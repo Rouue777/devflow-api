@@ -74,34 +74,58 @@ export class TasksService {
   // =========================
   // LISTAR TAREFAS
   // =========================
-
- async findAll(
+async findAll(
   projectId: number,
   userId: number,
   filters: FilterTasksDto,
 ) {
   await this.checkProjectMember(projectId, userId);
 
-  return this.prisma.tarefa.findMany({
-    where: {
-      projetoId: projectId,
-      status: filters.status,
-      prioridade: filters.prioridade,
-      responsavelId: filters.responsavelId,
-    },
-    include: {
-      responsavel: {
-        select: {
-          id: true,
-          nome: true,
-          email: true,
+  const page = filters.page ?? 1;
+  const limit = filters.limit ?? 10;
+
+  const skip = (page - 1) * limit;
+
+  const where = {
+    projetoId: projectId,
+    status: filters.status,
+    prioridade: filters.prioridade,
+    responsavelId: filters.responsavelId,
+  };
+
+  const [tarefas, total] = await Promise.all([
+    this.prisma.tarefa.findMany({
+      where,
+      skip,
+      take: limit,
+      include: {
+        responsavel: {
+          select: {
+            id: true,
+            nome: true,
+            email: true,
+          },
         },
       },
+      orderBy: {
+        dataCriacao: 'desc',
+      },
+    }),
+
+    this.prisma.tarefa.count({
+      where,
+    }),
+  ]);
+
+  return {
+    data: tarefas,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
     },
-    orderBy: {
-      dataCriacao: 'desc',
-    },
-  });
+  };
 }
 
   // =========================

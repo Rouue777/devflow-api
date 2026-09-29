@@ -271,38 +271,36 @@ describe('TasksService - integração', () => {
 
 describe('consultas', () => {
   it('deve listar somente tarefas do projeto sem filtros', async () => {
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task 1',
-        prioridade: Prioridade.ALTA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task 1',
+      prioridade: Prioridade.ALTA,
+    });
 
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task 2',
-        prioridade: Prioridade.MEDIA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task 2',
+      prioridade: Prioridade.MEDIA,
+    });
 
-    const tarefas = await service.findAll(
+    const result = await service.findAll(
       projectId,
       memberId,
       {},
     );
 
-    expect(tarefas).toHaveLength(2);
+    expect(result.data).toHaveLength(2);
 
     expect(
-      tarefas.every(
-        (tarefa) =>
-          tarefa.projetoId === projectId,
+      result.data.every(
+        (tarefa) => tarefa.projetoId === projectId,
       ),
     ).toBe(true);
+
+    expect(result.meta).toEqual({
+      page: 1,
+      limit: 10,
+      total: 2,
+      totalPages: 1,
+    });
   });
 
   it('deve filtrar tarefas por status', async () => {
@@ -315,14 +313,10 @@ describe('consultas', () => {
       },
     );
 
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Outra task',
-        prioridade: Prioridade.MEDIA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Outra task',
+      prioridade: Prioridade.MEDIA,
+    });
 
     await prisma.tarefa.update({
       where: { id: task1.id },
@@ -331,7 +325,7 @@ describe('consultas', () => {
       },
     });
 
-    const tarefas = await service.findAll(
+    const result = await service.findAll(
       projectId,
       userId,
       {
@@ -339,33 +333,27 @@ describe('consultas', () => {
       },
     );
 
-    expect(tarefas).toHaveLength(1);
-    expect(tarefas[0].id).toBe(task1.id);
-    expect(tarefas[0].status).toBe(
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].id).toBe(task1.id);
+    expect(result.data[0].status).toBe(
       StatusTarefa.EM_PROGRESSO,
     );
+
+    expect(result.meta.total).toBe(1);
   });
 
   it('deve filtrar tarefas por prioridade', async () => {
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task alta',
-        prioridade: Prioridade.ALTA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task alta',
+      prioridade: Prioridade.ALTA,
+    });
 
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task baixa',
-        prioridade: Prioridade.BAIXA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task baixa',
+      prioridade: Prioridade.BAIXA,
+    });
 
-    const tarefas = await service.findAll(
+    const result = await service.findAll(
       projectId,
       userId,
       {
@@ -373,34 +361,30 @@ describe('consultas', () => {
       },
     );
 
-    expect(tarefas).toHaveLength(1);
-    expect(tarefas[0].titulo).toBe('Task alta');
-    expect(tarefas[0].prioridade).toBe(
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].titulo).toBe(
+      'Task alta',
+    );
+    expect(result.data[0].prioridade).toBe(
       Prioridade.ALTA,
     );
+
+    expect(result.meta.total).toBe(1);
   });
 
   it('deve filtrar tarefas por responsável', async () => {
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task do membro',
-        prioridade: Prioridade.ALTA,
-        responsavelId: memberId,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task do membro',
+      prioridade: Prioridade.ALTA,
+      responsavelId: memberId,
+    });
 
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task sem responsável',
-        prioridade: Prioridade.MEDIA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task sem responsável',
+      prioridade: Prioridade.MEDIA,
+    });
 
-    const tarefas = await service.findAll(
+    const result = await service.findAll(
       projectId,
       userId,
       {
@@ -408,13 +392,15 @@ describe('consultas', () => {
       },
     );
 
-    expect(tarefas).toHaveLength(1);
-    expect(tarefas[0].titulo).toBe(
+    expect(result.data).toHaveLength(1);
+    expect(result.data[0].titulo).toBe(
       'Task do membro',
     );
-    expect(tarefas[0].responsavelId).toBe(
+    expect(result.data[0].responsavelId).toBe(
       memberId,
     );
+
+    expect(result.meta.total).toBe(1);
   });
 
   it('deve combinar status, prioridade e responsável', async () => {
@@ -435,16 +421,12 @@ describe('consultas', () => {
       },
     });
 
-    await service.create(
-      projectId,
-      userId,
-      {
-        titulo: 'Task diferente',
-        prioridade: Prioridade.BAIXA,
-      },
-    );
+    await service.create(projectId, userId, {
+      titulo: 'Task diferente',
+      prioridade: Prioridade.BAIXA,
+    });
 
-    const tarefas = await service.findAll(
+    const result = await service.findAll(
       projectId,
       userId,
       {
@@ -454,24 +436,101 @@ describe('consultas', () => {
       },
     );
 
-    expect(tarefas).toHaveLength(1);
+    expect(result.data).toHaveLength(1);
 
-    expect(tarefas[0].titulo).toBe(
+    expect(result.data[0].titulo).toBe(
       'Task correspondente',
     );
 
-    expect(tarefas[0].status).toBe(
+    expect(result.data[0].status).toBe(
       StatusTarefa.EM_PROGRESSO,
     );
 
-    expect(tarefas[0].prioridade).toBe(
+    expect(result.data[0].prioridade).toBe(
       Prioridade.ALTA,
     );
 
-    expect(tarefas[0].responsavelId).toBe(
+    expect(result.data[0].responsavelId).toBe(
       memberId,
     );
+
+    expect(result.meta.total).toBe(1);
   });
+
+  // ==================================================
+  // PAGINAÇÃO
+  // ==================================================
+
+  it('deve paginar as tarefas corretamente', async () => {
+    for (let i = 1; i <= 5; i++) {
+      await service.create(projectId, userId, {
+        titulo: `Task ${i}`,
+        prioridade: Prioridade.MEDIA,
+      });
+    }
+
+    const result = await service.findAll(
+      projectId,
+      userId,
+      {
+        page: 2,
+        limit: 2,
+      },
+    );
+
+    expect(result.data).toHaveLength(2);
+
+    expect(result.meta).toEqual({
+      page: 2,
+      limit: 2,
+      total: 5,
+      totalPages: 3,
+    });
+  });
+
+  it('deve aplicar paginação junto com filtros', async () => {
+    for (let i = 1; i <= 3; i++) {
+      await service.create(projectId, userId, {
+        titulo: `Task alta ${i}`,
+        prioridade: Prioridade.ALTA,
+      });
+    }
+
+    await service.create(projectId, userId, {
+      titulo: 'Task baixa',
+      prioridade: Prioridade.BAIXA,
+    });
+
+    const result = await service.findAll(
+      projectId,
+      userId,
+      {
+        prioridade: Prioridade.ALTA,
+        page: 1,
+        limit: 2,
+      },
+    );
+
+    expect(result.data).toHaveLength(2);
+
+    expect(
+      result.data.every(
+        (tarefa) =>
+          tarefa.prioridade === Prioridade.ALTA,
+      ),
+    ).toBe(true);
+
+    expect(result.meta).toEqual({
+      page: 1,
+      limit: 2,
+      total: 3,
+      totalPages: 2,
+    });
+  });
+
+  // ==================================================
+  // FIND ONE
+  // ==================================================
 
   it('deve buscar uma tarefa específica', async () => {
     const criada = await service.create(
