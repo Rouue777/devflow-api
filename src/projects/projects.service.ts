@@ -165,7 +165,7 @@ export class ProjectsService {
     async addMember(
         projectId: number,
         userId: number,
-        memberId: number,
+        email: string,
     ) {
         // Verifica se o projeto existe
         const projeto = await this.prisma.projeto.findUnique({
@@ -185,12 +185,14 @@ export class ProjectsService {
 
         // Verifica se o usuário que será adicionado existe
         const usuario = await this.prisma.usuario.findUnique({
-            where: { id: memberId },
+            where: { email },
         });
 
         if (!usuario) {
             throw new NotFoundException('Usuário não encontrado');
         }
+
+        const memberId = usuario.id;
 
         // Verifica se já é membro
         const membroExistente =

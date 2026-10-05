@@ -84,7 +84,7 @@ addMember(
   return this.projectsService.addMember(
     projectId,
     userId,
-    dto.usuarioId,
+    dto.email,
   );
 }
 

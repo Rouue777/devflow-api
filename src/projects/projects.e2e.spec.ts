@@ -253,13 +253,36 @@ describe('Projects - E2E', () => {
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(201);
 
     expect(response.body.usuarioId).toBe(
       outroUsuario!.id,
     );
+    expect(response.body.usuario).toEqual({
+      id: outroUsuario!.id,
+      nome: outroUsuario!.nome,
+      email: outroEmail,
+    });
+  });
+
+  it('deve retornar 404 quando o email não pertencer a um usuário', async () => {
+    const projeto = await request(app.getHttpServer())
+      .post('/api/v1/projects')
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        nome: 'DevFlow',
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/projects/${projeto.body.id}/members`)
+      .set('Authorization', `Bearer ${token}`)
+      .send({
+        email: 'usuario.inexistente@email.com',
+      })
+      .expect(404);
   });
 
   it('deve impedir usuário que não é responsável de adicionar membro', async () => {
@@ -282,7 +305,7 @@ describe('Projects - E2E', () => {
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${outroToken}`)
       .send({
-        usuarioId: usuarioResponsavel!.id,
+        email: usuarioResponsavel!.email,
       })
       .expect(403);
   });
@@ -296,18 +319,12 @@ describe('Projects - E2E', () => {
       })
       .expect(201);
 
-    const outroUsuario = await prisma.usuario.findUnique({
-      where: {
-        email: outroEmail,
-      },
-    });
-
     // Primeira adição
     await request(app.getHttpServer())
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(201);
 
@@ -316,7 +333,7 @@ describe('Projects - E2E', () => {
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(409);
   });
@@ -330,17 +347,11 @@ describe('Projects - E2E', () => {
       })
       .expect(201);
 
-    const outroUsuario = await prisma.usuario.findUnique({
-      where: {
-        email: outroEmail,
-      },
-    });
-
     await request(app.getHttpServer())
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(201);
 
@@ -350,12 +361,15 @@ describe('Projects - E2E', () => {
       .expect(200);
 
     expect(response.body).toHaveLength(2);
-
-    const ids = response.body.map(
-      (membro: any) => membro.usuario.id,
+    expect(response.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          usuario: expect.objectContaining({
+            email: outroEmail,
+          }),
+        }),
+      ]),
     );
-
-    expect(ids).toContain(outroUsuario!.id);
   });
 
   it('deve permitir que um membro visualize os membros do projeto', async () => {
@@ -367,17 +381,11 @@ describe('Projects - E2E', () => {
       })
       .expect(201);
 
-    const outroUsuario = await prisma.usuario.findUnique({
-      where: {
-        email: outroEmail,
-      },
-    });
-
     await request(app.getHttpServer())
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(201);
 
@@ -408,7 +416,7 @@ describe('Projects - E2E', () => {
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(201);
 
@@ -475,7 +483,7 @@ describe('Projects - E2E', () => {
       .post(`/api/v1/projects/${projeto.body.id}/members`)
       .set('Authorization', `Bearer ${token}`)
       .send({
-        usuarioId: outroUsuario!.id,
+        email: outroEmail,
       })
       .expect(201);
 

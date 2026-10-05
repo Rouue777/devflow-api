@@ -262,6 +262,7 @@ beforeEach(() => {
     const projectId = 1;
     const userId = 1;
     const memberId = 2;
+    const memberEmail = 'membro@email.com';
 
     prisma.projeto.findUnique.mockResolvedValue({
       id: projectId,
@@ -271,6 +272,7 @@ beforeEach(() => {
     prisma.usuario.findUnique.mockResolvedValue({
       id: memberId,
       nome: 'Novo membro',
+      email: memberEmail,
     });
 
     prisma.projetoUsuario.findUnique.mockResolvedValue(
@@ -289,8 +291,12 @@ beforeEach(() => {
     const result = await service.addMember(
       projectId,
       userId,
-      memberId,
+      memberEmail,
     );
+
+    expect(prisma.usuario.findUnique).toHaveBeenCalledWith({
+      where: { email: memberEmail },
+    });
 
     expect(
       prisma.projetoUsuario.create,
@@ -313,7 +319,7 @@ beforeEach(() => {
     });
 
     await expect(
-      service.addMember(1, 20, 2),
+      service.addMember(1, 20, 'membro@email.com'),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
     expect(
@@ -330,7 +336,7 @@ beforeEach(() => {
     prisma.usuario.findUnique.mockResolvedValue(null);
 
     await expect(
-      service.addMember(1, 1, 999),
+      service.addMember(1, 1, 'inexistente@email.com'),
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(
@@ -354,7 +360,7 @@ beforeEach(() => {
     });
 
     await expect(
-      service.addMember(1, 1, 2),
+      service.addMember(1, 1, 'membro@email.com'),
     ).rejects.toBeInstanceOf(ConflictException);
 
     expect(

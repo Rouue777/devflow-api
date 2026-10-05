@@ -200,7 +200,7 @@ describe('ProjectsService - integração', () => {
     const membro = await service.addMember(
       projeto.id,
       userId,
-      outroUserId,
+      outroEmail,
     );
 
     // ASSERT
@@ -231,7 +231,7 @@ describe('ProjectsService - integração', () => {
     await service.addMember(
       projeto.id,
       userId,
-      outroUserId,
+      outroEmail,
     );
 
     // ACT
@@ -262,7 +262,7 @@ describe('ProjectsService - integração', () => {
       service.addMember(
         projeto.id,
         outroUserId,
-        outroUserId,
+        outroEmail,
       ),
     ).rejects.toBeInstanceOf(ForbiddenException);
 
@@ -288,7 +288,7 @@ describe('ProjectsService - integração', () => {
     await service.addMember(
       projeto.id,
       userId,
-      outroUserId,
+      outroEmail,
     );
 
     // ACT + ASSERT
@@ -296,7 +296,7 @@ describe('ProjectsService - integração', () => {
       service.addMember(
         projeto.id,
         userId,
-        outroUserId,
+        outroEmail,
       ),
     ).rejects.toBeInstanceOf(ConflictException);
   });
@@ -310,7 +310,7 @@ describe('ProjectsService - integração', () => {
     await service.addMember(
       projeto.id,
       userId,
-      outroUserId,
+      outroEmail,
     );
 
     // ACT
@@ -332,7 +332,7 @@ describe('ProjectsService - integração', () => {
     await service.addMember(
       projeto.id,
       userId,
-      outroUserId,
+      outroEmail,
     );
 
     // ACT
@@ -394,7 +394,7 @@ describe('ProjectsService - integração', () => {
     await service.addMember(
       projeto.id,
       userId,
-      outroUserId,
+      outroEmail,
     );
 
     // ACT + ASSERT
