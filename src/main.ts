@@ -5,6 +5,17 @@ import { AppModule } from './app.module';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  const allowedOrigins = [
+    'http://localhost:3000',
+    process.env.FRONTEND_URL,
+  ].filter((origin): origin is string => Boolean(origin));
+
+  app.enableCors({
+    origin: allowedOrigins,
+    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   app.setGlobalPrefix('api/v1');
 
   app.useGlobalPipes(
@@ -17,7 +28,5 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ?? 3000);
 }
-
-console.log("Running at : " + "http://localhost:3000/api/v1")
 
 bootstrap();
